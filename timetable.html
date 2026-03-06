@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>시간표</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #f7f9fc;
+            --bg-secondary: #ffffff;
+            --bg-soft: #eef3f9;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --border-subtle: #dbe5f1;
+            --shadow-soft: 0 10px 25px rgba(15, 23, 42, 0.06);
+            --accent: #2563eb;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Noto Sans KR", "Outfit", sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1480px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            padding: 1.5rem 0;
+        }
+
+        h1 {
+            font-family: "Outfit", sans-serif;
+            font-size: 2.2rem;
+            letter-spacing: -0.02em;
+            font-weight: 700;
+        }
+
+        h1 span {
+            background: linear-gradient(120deg, #0891b2, #2563eb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            box-shadow: var(--shadow-soft);
+            padding: 1.1rem 1.2rem;
+            margin-bottom: 1rem;
+        }
+
+        .people-grid {
+            display: flex;
+            gap: 0.55rem;
+            flex-wrap: wrap;
+            margin-top: 0.6rem;
+        }
+
+        .people-controls {
+            margin-top: 0.75rem;
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .people-controls input {
+            border: 1px solid var(--border-subtle);
+            background: #fff;
+            border-radius: 10px;
+            height: 36px;
+            padding: 0 0.7rem;
+            color: var(--text-primary);
+            font-size: 0.82rem;
+            outline: none;
+            min-width: 180px;
+        }
+
+        .people-controls button {
+            border: none;
+            border-radius: 10px;
+            height: 36px;
+            padding: 0 0.85rem;
+            background: var(--accent);
+            color: #fff;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .person-tag {
+            background: var(--bg-soft);
+            border-radius: 999px;
+            padding: 0.35rem 0.55rem 0.35rem 0.75rem;
+            font-size: 0.83rem;
+            color: #334155;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .person-name {
+            cursor: pointer;
+        }
+
+        .person-tag.assignable .person-name:hover {
+            text-decoration: underline;
+        }
+
+        .person-tag.assigned {
+            outline: 2px solid rgba(37, 99, 235, 0.35);
+            background: #dbeafe;
+            color: #1e3a8a;
+        }
+
+        .section-title {
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            letter-spacing: 0.06em;
+        }
+
+        .add-form {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr 0.72fr 0.72fr 0.72fr 0.72fr 0.72fr auto;
+            gap: 0.6rem;
+            align-items: end;
+            margin-top: 0.8rem;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .field label {
+            font-size: 0.73rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .field input,
+        .field select {
+            border: 1px solid var(--border-subtle);
+            background: #fff;
+            border-radius: 10px;
+            height: 40px;
+            padding: 0 0.7rem;
+            color: var(--text-primary);
+            font-size: 0.86rem;
+            outline: none;
+        }
+
+        .field input:focus,
+        .field select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+        }
+
+        .add-btn {
+            border: none;
+            border-radius: 10px;
+            height: 40px;
+            padding: 0 0.95rem;
+            background: var(--accent);
+            color: #fff;
+            font-size: 0.84rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .subject-list {
+            margin-top: 0.9rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.55rem;
+        }
+
+        .subject-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            border-radius: 999px;
+            padding: 0.36rem 0.62rem;
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: #0f172a;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .subject-chip.active {
+            border-color: rgba(37, 99, 235, 0.55);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        }
+
+        .subject-chip button {
+            border: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(15, 23, 42, 0.12);
+            color: #0f172a;
+            cursor: pointer;
+            font-size: 0.78rem;
+            line-height: 1;
+        }
+
+        .person-tag button {
+            border: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: rgba(15, 23, 42, 0.12);
+            color: #0f172a;
+            cursor: pointer;
+            font-size: 0.72rem;
+            margin-left: 0.35rem;
+            line-height: 1;
+            vertical-align: middle;
+        }
+
+        .selection-hint {
+            margin-top: 0.65rem;
+            color: var(--text-secondary);
+            font-size: 0.79rem;
+        }
+
+        .timetable-wrap {
+            overflow-x: auto;
+            padding-top: 1.1rem;
+            padding-bottom: 1.1rem;
+        }
+
+        .timetable {
+            width: 100%;
+            min-width: 980px;
+        }
+
+        .schedule-head {
+            display: grid;
+            grid-template-columns: 88px repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 0.45rem;
+        }
+
+        .head-cell {
+            font-size: 0.82rem;
+            color: #475569;
+            font-weight: 700;
+            text-align: center;
+            padding: 0.25rem 0.35rem 0.45rem;
+        }
+
+        .schedule-body {
+            display: grid;
+            grid-template-columns: 88px 1fr;
+            gap: 10px;
+        }
+
+        .time-axis {
+            position: relative;
+            background: transparent;
+        }
+
+        .time-mark {
+            position: absolute;
+            left: 0;
+            right: 0;
+            transform: translateY(-0.5px);
+            font-size: 0.75rem;
+            color: #64748b;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .days-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+        }
+
+        .day-track {
+            position: relative;
+            border-radius: 12px;
+            background-color: #ffffff;
+            background-image: linear-gradient(to bottom, rgba(148, 163, 184, 0.18) 1px, transparent 1px);
+            overflow: hidden;
+            border: 1px solid #eef2f7;
+        }
+
+        .event-block {
+            position: absolute;
+            left: 0;
+            right: 0;
+            border-radius: 10px;
+            padding: 0.35rem 0.48rem;
+            font-size: 0.73rem;
+            color: #0f172a;
+            line-height: 1.25;
+            font-weight: 600;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+            cursor: pointer;
+        }
+
+        .event-block.dimmed {
+            opacity: 0.5;
+        }
+
+        .event-block.overlap-right {
+            text-align: right;
+        }
+
+        .event-block .prof-line,
+        .event-block .people-line {
+            display: block;
+            margin-top: 0.08rem;
+            font-size: 0.68rem;
+            color: rgba(15, 23, 42, 0.7);
+            font-weight: 500;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.42);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            padding: 1rem;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal-box {
+            width: min(560px, 100%);
+            max-height: 82vh;
+            overflow: auto;
+            border-radius: 14px;
+            background: #ffffff;
+            border: 1px solid var(--border-subtle);
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.24);
+            padding: 1rem;
+        }
+
+        .modal-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            margin-bottom: 0.7rem;
+        }
+
+        .modal-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem 0.9rem;
+            margin-bottom: 0.85rem;
+        }
+
+        .modal-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.82rem;
+            color: #334155;
+        }
+
+        .modal-item input[type="checkbox"] {
+            accent-color: #111111;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+
+        .modal-btn {
+            border: 1px solid var(--border-subtle);
+            border-radius: 9px;
+            height: 34px;
+            padding: 0 0.75rem;
+            background: #fff;
+            color: #334155;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .modal-btn.primary {
+            background: var(--accent);
+            color: #fff;
+            border-color: transparent;
+        }
+
+        @media (max-width: 1020px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .add-form {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .add-btn {
+                grid-column: span 2;
+            }
+
+            .schedule-head,
+            .schedule-body {
+                min-width: 860px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Timetable</h1>
+        </header>
+
+        <section class="card">
+            <div class="section-title">학생 목록</div>
+            <div id="peopleList" class="people-grid"></div>
+            <div class="people-controls">
+                <input id="personNameInput" type="text" placeholder="인원 이름 입력">
+                <button id="addPersonBtn" type="button">인원 추가</button>
+            </div>
+            <p id="selectionHint" class="selection-hint">과목 칩을 클릭하면 인원을 선택할 수 있습니다.</p>
+        </section>
+
+        <section class="card">
+            <div class="section-title">과목 추가</div>
+            <form id="subjectForm" class="add-form">
+                <div class="field">
+                    <label for="subjectName">과목명</label>
+                    <input id="subjectName" type="text" placeholder="예: 자료구조" required>
+                </div>
+                <div class="field">
+                    <label for="professorName">교수명</label>
+                    <input id="professorName" type="text" placeholder="예: 김교수" required>
+                </div>
+                <div class="field">
+                    <label for="day">요일</label>
+                    <select id="day" required>
+                        <option value="0">월</option>
+                        <option value="1">화</option>
+                        <option value="2">수</option>
+                        <option value="3">목</option>
+                        <option value="4">금</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="startHour">시작(시)</label>
+                    <select id="startHour"></select>
+                </div>
+                <div class="field">
+                    <label for="startMinute">시작(분)</label>
+                    <select id="startMinute"></select>
+                </div>
+                <div class="field">
+                    <label for="endHour">종료(시)</label>
+                    <select id="endHour"></select>
+                </div>
+                <div class="field">
+                    <label for="endMinute">종료(분)</label>
+                    <select id="endMinute"></select>
+                </div>
+                <button type="submit" class="add-btn">추가</button>
+            </form>
+            <div id="subjectList" class="subject-list"></div>
+        </section>
+
+        <section class="card timetable-wrap">
+            <div class="timetable">
+                <div class="schedule-head">
+                    <div class="head-cell">시간</div>
+                    <div class="head-cell">월</div>
+                    <div class="head-cell">화</div>
+                    <div class="head-cell">수</div>
+                    <div class="head-cell">목</div>
+                    <div class="head-cell">금</div>
+                </div>
+                <div class="schedule-body">
+                    <div id="timeAxis" class="time-axis"></div>
+                    <div id="daysGrid" class="days-grid"></div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div id="assignModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="assignModalTitle">
+        <div class="modal-box">
+            <div id="assignModalTitle" class="modal-title">학생 선택</div>
+            <div id="assignModalGrid" class="modal-grid"></div>
+            <div class="modal-actions">
+                <button id="assignModalCancel" type="button" class="modal-btn">취소</button>
+                <button id="assignModalSave" type="button" class="modal-btn primary">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            var STORAGE_KEY = "uni-timetable-v5";
+            var TIME_START = 9;
+            var TIME_END = 18;
+            var SLOT_MINUTE_STEP = 15;
+            var PIXELS_PER_MINUTE = 1.05;
+            var BOTTOM_PADDING_MINUTES = 0;
+            var DAYS = ["월", "화", "수", "목", "금"];
+            var DEFAULT_PEOPLE = ["황재윤", "Priyanka", "윤상원", "최현수", "김민성", "이정민", "김도현", "박세현", "김성현", "이찬근", "이종헌", "오재은"];
+            var entries = [];
+            var colorBySubject = {};
+            var people = [];
+            var subjectPeople = {};
+            var activeSubject = null;
+
+            var subjectForm = document.getElementById("subjectForm");
+            var subjectNameEl = document.getElementById("subjectName");
+            var professorNameEl = document.getElementById("professorName");
+            var dayEl = document.getElementById("day");
+            var startHourEl = document.getElementById("startHour");
+            var startMinuteEl = document.getElementById("startMinute");
+            var endHourEl = document.getElementById("endHour");
+            var endMinuteEl = document.getElementById("endMinute");
+            var subjectListEl = document.getElementById("subjectList");
+            var timeAxisEl = document.getElementById("timeAxis");
+            var daysGridEl = document.getElementById("daysGrid");
+            var peopleListEl = document.getElementById("peopleList");
+            var personNameInputEl = document.getElementById("personNameInput");
+            var addPersonBtnEl = document.getElementById("addPersonBtn");
+            var selectionHintEl = document.getElementById("selectionHint");
+            var assignModalEl = document.getElementById("assignModal");
+            var assignModalTitleEl = document.getElementById("assignModalTitle");
+            var assignModalGridEl = document.getElementById("assignModalGrid");
+            var assignModalCancelEl = document.getElementById("assignModalCancel");
+            var assignModalSaveEl = document.getElementById("assignModalSave");
+            var modalEditingSubject = null;
+            var modalCheckedPeople = [];
+
+            function buildHourOptions() {
+                for (var h = TIME_START; h < TIME_END; h += 1) {
+                    var optionStart = document.createElement("option");
+                    optionStart.value = String(h);
+                    optionStart.textContent = pad2(h) + ":00";
+                    startHourEl.appendChild(optionStart);
+                }
+
+                for (var e = TIME_START + 1; e <= TIME_END; e += 1) {
+                    var optionEnd = document.createElement("option");
+                    optionEnd.value = String(e);
+                    optionEnd.textContent = pad2(e) + ":00";
+                    endHourEl.appendChild(optionEnd);
+                }
+
+                startHourEl.value = String(TIME_START);
+                endHourEl.value = String(TIME_START + 1);
+            }
+
+            function buildMinuteOptions() {
+                for (var m = 0; m < 60; m += SLOT_MINUTE_STEP) {
+                    var minuteText = pad2(m);
+                    var startOpt = document.createElement("option");
+                    startOpt.value = minuteText;
+                    startOpt.textContent = minuteText + "분";
+                    startMinuteEl.appendChild(startOpt);
+
+                    var endOpt = document.createElement("option");
+                    endOpt.value = minuteText;
+                    endOpt.textContent = minuteText + "분";
+                    endMinuteEl.appendChild(endOpt);
+                }
+                startMinuteEl.value = "00";
+                endMinuteEl.value = "00";
+            }
+
+            function pad2(num) {
+                return num < 10 ? "0" + num : String(num);
+            }
+
+            function saveData() {
+                localStorage.setItem(
+                    STORAGE_KEY,
+                    JSON.stringify({
+                        entries: entries,
+                        colorBySubject: colorBySubject,
+                        people: people,
+                        subjectPeople: subjectPeople
+                    })
+                );
+            }
+
+            function loadData() {
+                try {
+                    var raw = localStorage.getItem(STORAGE_KEY);
+                    if (!raw) {
+                        return;
+                    }
+                    var parsed = JSON.parse(raw);
+                    entries = Array.isArray(parsed.entries) ? parsed.entries : [];
+                    colorBySubject = parsed.colorBySubject || {};
+                    people = Array.isArray(parsed.people) ? parsed.people : [];
+                    subjectPeople = parsed.subjectPeople || {};
+                    entries = entries.map(function (entry) {
+                        var startMin = typeof entry.startMin === "number" ? entry.startMin : Number(entry.start) * 60;
+                        var endMin = typeof entry.endMin === "number" ? entry.endMin : Number(entry.end) * 60;
+                        return {
+                            id: entry.id || (Date.now() + "-" + Math.random().toString(16).slice(2)),
+                            subject: entry.subject || "",
+                            professor: entry.professor || "",
+                            day: Number(entry.day) || 0,
+                            startMin: startMin,
+                            endMin: endMin,
+                            isOverlap: Boolean(entry.isOverlap)
+                        };
+                    });
+                    entries.forEach(function (entry) {
+                        if (!Array.isArray(subjectPeople[entry.subject])) {
+                            subjectPeople[entry.subject] = [];
+                        }
+                        if (Array.isArray(entry.selectedPeople)) {
+                            entry.selectedPeople.forEach(function (personName) {
+                                if (subjectPeople[entry.subject].indexOf(personName) === -1) {
+                                    subjectPeople[entry.subject].push(personName);
+                                }
+                            });
+                        }
+                    });
+                } catch (error) {
+                    entries = [];
+                    colorBySubject = {};
+                    people = [];
+                    subjectPeople = {};
+                }
+                if (people.length === 0) {
+                    people = DEFAULT_PEOPLE.slice();
+                }
+                recomputeOverlapFlags();
+            }
+
+            function recomputeOverlapFlags() {
+                entries.forEach(function (entry, currentIdx) {
+                    var overlap = entries.some(function (other, otherIdx) {
+                        if (otherIdx >= currentIdx) {
+                            return false;
+                        }
+                        if (other.day !== entry.day) {
+                            return false;
+                        }
+                        return entry.startMin < other.endMin && entry.endMin > other.startMin;
+                    });
+                    entry.isOverlap = overlap;
+                });
+            }
+
+            function getSubjectColor(subject) {
+                if (colorBySubject[subject]) {
+                    return colorBySubject[subject];
+                }
+                var index = Object.keys(colorBySubject).length;
+                var hue = Math.round((index * 137.508) % 360);
+                var bg = "hsl(" + hue + " 86% 86%)";
+                colorBySubject[subject] = bg;
+                return bg;
+            }
+
+            function renderTimetable() {
+                var totalMinutes = (TIME_END - TIME_START) * 60;
+                var totalMinutesWithPadding = totalMinutes + BOTTOM_PADDING_MINUTES;
+                var trackHeight = totalMinutesWithPadding * PIXELS_PER_MINUTE;
+
+                timeAxisEl.innerHTML = "";
+                timeAxisEl.style.height = trackHeight + "px";
+
+                for (var hour = TIME_START; hour <= TIME_END; hour += 1) {
+                    var label = document.createElement("div");
+                    label.className = "time-mark";
+                    label.style.top = ((hour - TIME_START) * 60 * PIXELS_PER_MINUTE) + "px";
+                    label.textContent = pad2(hour) + ":00";
+                    timeAxisEl.appendChild(label);
+                }
+
+                daysGridEl.innerHTML = "";
+
+                for (var d = 0; d < 5; d += 1) {
+                    var track = document.createElement("div");
+                    track.className = "day-track";
+                    track.style.height = trackHeight + "px";
+                    track.style.backgroundSize = "100% " + (60 * PIXELS_PER_MINUTE) + "px";
+
+                    var groups = {};
+                    entries.forEach(function (entry) {
+                        if (entry.day !== d) {
+                            return;
+                        }
+                        var groupKey = String(entry.startMin) + "-" + String(entry.endMin);
+                        if (!groups[groupKey]) {
+                            groups[groupKey] = {
+                                startMin: entry.startMin,
+                                endMin: entry.endMin,
+                                subjects: [],
+                                professors: [],
+                                people: [],
+                                color: getSubjectColor(entry.subject),
+                                subjectSet: {},
+                                hasOverlap: false
+                            };
+                        }
+                        if (groups[groupKey].subjects.indexOf(entry.subject) === -1) {
+                            groups[groupKey].subjects.push(entry.subject);
+                            groups[groupKey].subjectSet[entry.subject] = true;
+                        }
+                        if (groups[groupKey].professors.indexOf(entry.professor) === -1) {
+                            groups[groupKey].professors.push(entry.professor);
+                        }
+                        (subjectPeople[entry.subject] || []).forEach(function (personName) {
+                            if (groups[groupKey].people.indexOf(personName) === -1) {
+                                groups[groupKey].people.push(personName);
+                            }
+                        });
+                        if (entry.isOverlap) {
+                            groups[groupKey].hasOverlap = true;
+                        }
+                    });
+
+                    Object.keys(groups)
+                        .map(function (key) { return groups[key]; })
+                        .sort(function (a, b) { return a.startMin - b.startMin; })
+                        .forEach(function (group) {
+                            var top = (group.startMin - (TIME_START * 60)) * PIXELS_PER_MINUTE;
+                            var height = (group.endMin - group.startMin) * PIXELS_PER_MINUTE;
+                            if (height < 20) {
+                                height = 20;
+                            }
+
+                            var block = document.createElement("div");
+                            block.className = "event-block";
+                            block.style.top = top + "px";
+                            block.style.height = height + "px";
+                            block.style.background = group.color;
+                            if (group.hasOverlap) {
+                                block.classList.add("dimmed");
+                                block.classList.add("overlap-right");
+                            }
+                            block.innerHTML =
+                                escapeHtml(group.subjects.join(", ")) +
+                                '<span class="prof-line">' + escapeHtml(group.professors.join(", ")) + "</span>" +
+                                (group.people.length > 0
+                                    ? '<span class="people-line">' + escapeHtml(group.people.join(", ")) + "</span>"
+                                    : "");
+                            block.addEventListener("click", function () {
+                                var targetSubject = group.subjects[0] || null;
+                                if (!targetSubject) {
+                                    return;
+                                }
+                                activeSubject = targetSubject;
+                                openAssignModal(targetSubject);
+                                renderAll();
+                            });
+                            track.appendChild(block);
+                        });
+
+                    daysGridEl.appendChild(track);
+                }
+            }
+
+            function renderSubjectList() {
+                subjectListEl.innerHTML = "";
+                if (entries.length === 0) {
+                    subjectListEl.innerHTML = '<span class="person-tag">추가된 과목이 없습니다.</span>';
+                    return;
+                }
+
+                var subjectMap = {};
+                entries.forEach(function (entry) {
+                    if (!subjectMap[entry.subject]) {
+                        subjectMap[entry.subject] = {
+                            subject: entry.subject,
+                            professors: [],
+                            schedules: []
+                        };
+                    }
+                    if (subjectMap[entry.subject].professors.indexOf(entry.professor) === -1) {
+                        subjectMap[entry.subject].professors.push(entry.professor);
+                    }
+                    subjectMap[entry.subject].schedules.push({
+                        day: entry.day,
+                        startMin: entry.startMin,
+                        endMin: entry.endMin
+                    });
+                });
+
+                Object.keys(subjectMap).forEach(function (subjectName) {
+                    var group = subjectMap[subjectName];
+                    group.schedules.sort(function (a, b) {
+                        if (a.day !== b.day) {
+                            return a.day - b.day;
+                        }
+                        return a.startMin - b.startMin;
+                    });
+
+                    var chip = document.createElement("div");
+                    chip.className = "subject-chip";
+                    if (subjectName === activeSubject) {
+                        chip.classList.add("active");
+                    }
+                    chip.style.background = getSubjectColor(subjectName);
+                    chip.innerHTML =
+                        "<span>" +
+                        escapeHtml(subjectName) +
+                        " · " +
+                        escapeHtml(group.professors.join(", ")) +
+                        " · " +
+                        escapeHtml(group.schedules.map(function (s) {
+                            return DAYS[s.day] + " " + formatTime(s.startMin) + "-" + formatTime(s.endMin);
+                        }).join(", ")) +
+                        "</span>";
+
+                    chip.addEventListener("click", function () {
+                        activeSubject = activeSubject === subjectName ? null : subjectName;
+                        renderAll();
+                    });
+
+                    var delBtn = document.createElement("button");
+                    delBtn.type = "button";
+                    delBtn.textContent = "x";
+                    delBtn.setAttribute("aria-label", "삭제");
+                    delBtn.addEventListener("click", function (event) {
+                        event.stopPropagation();
+                        entries = entries.filter(function (entry) {
+                            return entry.subject !== subjectName;
+                        });
+                        delete subjectPeople[subjectName];
+                        if (activeSubject === subjectName) {
+                            activeSubject = null;
+                        }
+                        recomputeOverlapFlags();
+                        saveData();
+                        renderAll();
+                    });
+
+                    chip.appendChild(delBtn);
+                    subjectListEl.appendChild(chip);
+                });
+            }
+
+            function renderPeopleList() {
+                peopleListEl.innerHTML = "";
+                var activeSubjectPeople = activeSubject ? (subjectPeople[activeSubject] || []) : null;
+
+                people.forEach(function (person, idx) {
+                    var chip = document.createElement("span");
+                    chip.className = "person-tag";
+                    if (activeSubject) {
+                        chip.classList.add("assignable");
+                        if (activeSubjectPeople.indexOf(person) !== -1) {
+                            chip.classList.add("assigned");
+                        }
+                    }
+
+                    var nameEl = document.createElement("span");
+                    nameEl.className = "person-name";
+                    nameEl.textContent = person;
+                    nameEl.addEventListener("click", function () {
+                        if (!activeSubject) {
+                            return;
+                        }
+                        if (!Array.isArray(subjectPeople[activeSubject])) {
+                            subjectPeople[activeSubject] = [];
+                        }
+                        var selectedIndex = subjectPeople[activeSubject].indexOf(person);
+                        if (selectedIndex === -1) {
+                            subjectPeople[activeSubject].push(person);
+                        } else {
+                            subjectPeople[activeSubject].splice(selectedIndex, 1);
+                        }
+                        saveData();
+                        renderAll();
+                    });
+                    chip.appendChild(nameEl);
+
+                    var removeBtn = document.createElement("button");
+                    removeBtn.type = "button";
+                    removeBtn.textContent = "x";
+                    removeBtn.setAttribute("aria-label", "인원 삭제");
+                    removeBtn.addEventListener("click", function (event) {
+                        event.stopPropagation();
+                        people.splice(idx, 1);
+                        Object.keys(subjectPeople).forEach(function (subjectName) {
+                            subjectPeople[subjectName] = (subjectPeople[subjectName] || []).filter(function (p) {
+                                return p !== person;
+                            });
+                        });
+                        saveData();
+                        renderAll();
+                    });
+                    chip.appendChild(removeBtn);
+
+                    peopleListEl.appendChild(chip);
+                });
+
+                if (activeSubject) {
+                    selectionHintEl.textContent = "'" + activeSubject + "' 과목 선택 중: 인원을 클릭해 배정/해제하세요.";
+                } else {
+                    selectionHintEl.textContent = "과목 칩 또는 시간표 블록을 클릭하면 인원을 선택할 수 있습니다.";
+                }
+            }
+
+            function openAssignModal(subjectName) {
+                modalEditingSubject = subjectName;
+                modalCheckedPeople = Array.isArray(subjectPeople[subjectName]) ? subjectPeople[subjectName].slice() : [];
+                assignModalTitleEl.textContent = "'" + subjectName + "' 학생 선택";
+                assignModalGridEl.innerHTML = "";
+
+                people.forEach(function (personName) {
+                    var label = document.createElement("label");
+                    label.className = "modal-item";
+
+                    var checkbox = document.createElement("input");
+                    checkbox.type = "checkbox";
+                    checkbox.checked = modalCheckedPeople.indexOf(personName) !== -1;
+                    checkbox.addEventListener("change", function () {
+                        var idx = modalCheckedPeople.indexOf(personName);
+                        if (checkbox.checked && idx === -1) {
+                            modalCheckedPeople.push(personName);
+                        }
+                        if (!checkbox.checked && idx !== -1) {
+                            modalCheckedPeople.splice(idx, 1);
+                        }
+                    });
+
+                    var text = document.createElement("span");
+                    text.textContent = personName;
+                    label.appendChild(checkbox);
+                    label.appendChild(text);
+                    assignModalGridEl.appendChild(label);
+                });
+
+                assignModalEl.classList.add("open");
+            }
+
+            function closeAssignModal() {
+                assignModalEl.classList.remove("open");
+                modalEditingSubject = null;
+                modalCheckedPeople = [];
+            }
+
+            function formatTime(totalMinute) {
+                var h = Math.floor(totalMinute / 60);
+                var m = totalMinute % 60;
+                return pad2(h) + ":" + pad2(m);
+            }
+
+            function escapeHtml(value) {
+                return String(value)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
+            function renderAll() {
+                renderSubjectList();
+                renderTimetable();
+                renderPeopleList();
+            }
+
+            subjectForm.addEventListener("submit", function (event) {
+                event.preventDefault();
+
+                var subject = subjectNameEl.value.trim();
+                var professor = professorNameEl.value.trim();
+                var day = Number(dayEl.value);
+                var start = Number(startHourEl.value);
+                var startMinute = Number(startMinuteEl.value);
+                var end = Number(endHourEl.value);
+                var endMinute = Number(endMinuteEl.value);
+                var startMin = (start * 60) + startMinute;
+                var endMin = (end * 60) + endMinute;
+
+                if (!subject || !professor) {
+                    return;
+                }
+                if (Number.isNaN(startMin) || Number.isNaN(endMin) || startMin >= endMin) {
+                    alert("종료 시간은 시작 시간보다 늦어야 합니다.");
+                    return;
+                }
+                if (startMin < (TIME_START * 60) || endMin > (TIME_END * 60)) {
+                    alert("시간표 범위(09:00 ~ 18:00) 내에서 선택해 주세요.");
+                    return;
+                }
+
+                entries.push({
+                    id: Date.now() + "-" + Math.random().toString(16).slice(2),
+                    subject: subject,
+                    professor: professor,
+                    day: day,
+                    startMin: startMin,
+                    endMin: endMin
+                });
+
+                getSubjectColor(subject);
+                if (!Array.isArray(subjectPeople[subject])) {
+                    subjectPeople[subject] = [];
+                }
+                recomputeOverlapFlags();
+                saveData();
+                renderAll();
+                subjectForm.reset();
+                dayEl.value = "0";
+                startHourEl.value = String(TIME_START);
+                endHourEl.value = String(TIME_START + 1);
+                startMinuteEl.value = "00";
+                endMinuteEl.value = "00";
+                subjectNameEl.focus();
+            });
+
+            addPersonBtnEl.addEventListener("click", function () {
+                var name = personNameInputEl.value.trim();
+                if (!name) {
+                    return;
+                }
+                if (people.indexOf(name) !== -1) {
+                    personNameInputEl.value = "";
+                    return;
+                }
+                people.push(name);
+                personNameInputEl.value = "";
+                saveData();
+                renderAll();
+            });
+
+            personNameInputEl.addEventListener("keydown", function (event) {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    addPersonBtnEl.click();
+                }
+            });
+
+            assignModalCancelEl.addEventListener("click", function () {
+                closeAssignModal();
+            });
+
+            assignModalSaveEl.addEventListener("click", function () {
+                if (!modalEditingSubject) {
+                    closeAssignModal();
+                    return;
+                }
+                var unique = [];
+                modalCheckedPeople.forEach(function (personName) {
+                    if (people.indexOf(personName) !== -1 && unique.indexOf(personName) === -1) {
+                        unique.push(personName);
+                    }
+                });
+                subjectPeople[modalEditingSubject] = unique;
+                saveData();
+                closeAssignModal();
+                renderAll();
+            });
+
+            assignModalEl.addEventListener("click", function (event) {
+                if (event.target === assignModalEl) {
+                    closeAssignModal();
+                }
+            });
+
+            document.addEventListener("keydown", function (event) {
+                if (event.key === "Escape" && assignModalEl.classList.contains("open")) {
+                    closeAssignModal();
+                }
+            });
+
+            buildHourOptions();
+            buildMinuteOptions();
+            loadData();
+            renderAll();
+        })();
+    </script>
+</body>
+</html>
