@@ -438,18 +438,21 @@
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>Timetable</h1>
-        </header>
-
-        <section class="card">
-            <div class="section-title">학생 목록</div>
-            <div id="peopleList" class="people-grid"></div>
-            <div class="people-controls">
-                <input id="personNameInput" type="text" placeholder="인원 이름 입력">
-                <button id="addPersonBtn" type="button">인원 추가</button>
+        <section class="card timetable-wrap">
+            <div class="timetable">
+                <div class="schedule-head">
+                    <div class="head-cell">시간</div>
+                    <div class="head-cell">월</div>
+                    <div class="head-cell">화</div>
+                    <div class="head-cell">수</div>
+                    <div class="head-cell">목</div>
+                    <div class="head-cell">금</div>
+                </div>
+                <div class="schedule-body">
+                    <div id="timeAxis" class="time-axis"></div>
+                    <div id="daysGrid" class="days-grid"></div>
+                </div>
             </div>
-            <p id="selectionHint" class="selection-hint">과목 칩을 클릭하면 인원을 선택할 수 있습니다.</p>
         </section>
 
         <section class="card">
@@ -494,21 +497,14 @@
             <div id="subjectList" class="subject-list"></div>
         </section>
 
-        <section class="card timetable-wrap">
-            <div class="timetable">
-                <div class="schedule-head">
-                    <div class="head-cell">시간</div>
-                    <div class="head-cell">월</div>
-                    <div class="head-cell">화</div>
-                    <div class="head-cell">수</div>
-                    <div class="head-cell">목</div>
-                    <div class="head-cell">금</div>
-                </div>
-                <div class="schedule-body">
-                    <div id="timeAxis" class="time-axis"></div>
-                    <div id="daysGrid" class="days-grid"></div>
-                </div>
+        <section class="card">
+            <div class="section-title">학생 목록</div>
+            <div id="peopleList" class="people-grid"></div>
+            <div class="people-controls">
+                <input id="personNameInput" type="text" placeholder="인원 이름 입력">
+                <button id="addPersonBtn" type="button">인원 추가</button>
             </div>
+            <p id="selectionHint" class="selection-hint">과목 칩을 클릭하면 인원을 선택할 수 있습니다.</p>
         </section>
     </div>
 
