@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>시간표</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
     <style>
         :root {
             --bg-primary: #f7f9fc;
@@ -328,10 +331,6 @@
             opacity: 0.5;
         }
 
-        .event-block.overlap-right {
-            text-align: right;
-        }
-
         .event-block .prof-line,
         .event-block .people-line {
             display: block;
@@ -436,6 +435,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <section class="card timetable-wrap">
@@ -519,9 +519,13 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
         (function () {
-            var STORAGE_KEY = "uni-timetable-v5";
+            var LOCAL_FALLBACK_KEY = "uni-timetable-v6-fallback";
+            var SUPABASE_URL = "https://ychrynjxxrmrzuvuifol.supabase.co";
+            var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InljaHJ5bmp4eHJtcnp1dnVpZm9sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwMDk2NTgsImV4cCI6MjA4ODU4NTY1OH0.DkXgtX69hWxSWv_RZHxX7qdjCUfL7rXgyqQrffb_gsg";
+            var SCHEDULE_ID = "shared-timetable";
             var TIME_START = 9;
             var TIME_END = 18;
             var SLOT_MINUTE_STEP = 15;
@@ -557,6 +561,12 @@
             var assignModalSaveEl = document.getElementById("assignModalSave");
             var modalEditingSubject = null;
             var modalCheckedPeople = [];
+            var supabaseClient = null;
+            var saveTimer = null;
+            var saveInFlight = false;
+            var pendingSave = false;
+            var lastRemoteUpdatedAt = null;
+            var syncIntervalId = null;
 
             function buildHourOptions() {
                 for (var h = TIME_START; h < TIME_END; h += 1) {
@@ -598,42 +608,90 @@
                 return num < 10 ? "0" + num : String(num);
             }
 
-            function saveData() {
-                localStorage.setItem(
-                    STORAGE_KEY,
-                    JSON.stringify({
-                        entries: entries,
-                        colorBySubject: colorBySubject,
-                        people: people,
-                        subjectPeople: subjectPeople
-                    })
+            function canUseSupabase() {
+                return (
+                    typeof window.supabase !== "undefined" &&
+                    SUPABASE_URL &&
+                    SUPABASE_ANON_KEY &&
+                    SUPABASE_URL !== "YOUR_SUPABASE_URL" &&
+                    SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY"
                 );
             }
 
-            function loadData() {
+            function getSerializableData() {
+                return {
+                    entries: entries,
+                    colorBySubject: colorBySubject,
+                    people: people,
+                    subjectPeople: subjectPeople
+                };
+            }
+
+            function cacheDataLocally() {
+                localStorage.setItem(LOCAL_FALLBACK_KEY, JSON.stringify(getSerializableData()));
+            }
+
+            function createSupabaseClientIfNeeded() {
+                if (!canUseSupabase()) {
+                    return null;
+                }
+                if (!supabaseClient) {
+                    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                }
+                return supabaseClient;
+            }
+
+            function applyLoadedData(parsed) {
+                entries = Array.isArray(parsed.entries) ? parsed.entries : [];
+                colorBySubject = parsed.colorBySubject || {};
+                people = Array.isArray(parsed.people) ? parsed.people : [];
+                subjectPeople = parsed.subjectPeople || {};
+                entries = entries.map(function (entry) {
+                    var startMin = typeof entry.startMin === "number" ? entry.startMin : Number(entry.start) * 60;
+                    var endMin = typeof entry.endMin === "number" ? entry.endMin : Number(entry.end) * 60;
+                    return {
+                        id: entry.id || (Date.now() + "-" + Math.random().toString(16).slice(2)),
+                        subject: entry.subject || "",
+                        professor: entry.professor || "",
+                        day: Number(entry.day) || 0,
+                        startMin: startMin,
+                        endMin: endMin,
+                        isOverlap: Boolean(entry.isOverlap)
+                    };
+                });
+            }
+
+            async function pullRemoteState() {
+                var client = createSupabaseClientIfNeeded();
+                if (!client) {
+                    return null;
+                }
+                var result = await client
+                    .from("timetable_states")
+                    .select("payload, updated_at")
+                    .eq("schedule_id", SCHEDULE_ID)
+                    .maybeSingle();
+                if (result.error) {
+                    return null;
+                }
+                if (!result.data || !result.data.payload) {
+                    return null;
+                }
+                return result.data;
+            }
+
+            async function loadData() {
                 try {
-                    var raw = localStorage.getItem(STORAGE_KEY);
-                    if (!raw) {
-                        return;
+                    var remote = await pullRemoteState();
+                    if (remote && remote.payload) {
+                        applyLoadedData(remote.payload);
+                        lastRemoteUpdatedAt = remote.updated_at || null;
+                    } else {
+                        var raw = localStorage.getItem(LOCAL_FALLBACK_KEY);
+                        if (raw) {
+                            applyLoadedData(JSON.parse(raw));
+                        }
                     }
-                    var parsed = JSON.parse(raw);
-                    entries = Array.isArray(parsed.entries) ? parsed.entries : [];
-                    colorBySubject = parsed.colorBySubject || {};
-                    people = Array.isArray(parsed.people) ? parsed.people : [];
-                    subjectPeople = parsed.subjectPeople || {};
-                    entries = entries.map(function (entry) {
-                        var startMin = typeof entry.startMin === "number" ? entry.startMin : Number(entry.start) * 60;
-                        var endMin = typeof entry.endMin === "number" ? entry.endMin : Number(entry.end) * 60;
-                        return {
-                            id: entry.id || (Date.now() + "-" + Math.random().toString(16).slice(2)),
-                            subject: entry.subject || "",
-                            professor: entry.professor || "",
-                            day: Number(entry.day) || 0,
-                            startMin: startMin,
-                            endMin: endMin,
-                            isOverlap: Boolean(entry.isOverlap)
-                        };
-                    });
                     entries.forEach(function (entry) {
                         if (!Array.isArray(subjectPeople[entry.subject])) {
                             subjectPeople[entry.subject] = [];
@@ -658,10 +716,54 @@
                 recomputeOverlapFlags();
             }
 
+            async function persistDataNow() {
+                cacheDataLocally();
+                var client = createSupabaseClientIfNeeded();
+                if (!client) {
+                    return;
+                }
+                saveInFlight = true;
+                var nowIso = new Date().toISOString();
+                var payload = getSerializableData();
+                var result = await client
+                    .from("timetable_states")
+                    .upsert(
+                        {
+                            schedule_id: SCHEDULE_ID,
+                            payload: payload,
+                            updated_at: nowIso
+                        },
+                        { onConflict: "schedule_id" }
+                    );
+                saveInFlight = false;
+                if (!result.error) {
+                    lastRemoteUpdatedAt = nowIso;
+                }
+                if (pendingSave) {
+                    pendingSave = false;
+                    queueSaveData();
+                }
+            }
+
+            function queueSaveData() {
+                cacheDataLocally();
+                if (saveInFlight) {
+                    pendingSave = true;
+                    return;
+                }
+                if (saveTimer) {
+                    clearTimeout(saveTimer);
+                }
+                saveTimer = setTimeout(function () {
+                    saveTimer = null;
+                    persistDataNow();
+                }, 250);
+            }
+
             function recomputeOverlapFlags() {
                 entries.forEach(function (entry, currentIdx) {
                     var overlap = entries.some(function (other, otherIdx) {
-                        if (otherIdx >= currentIdx) {
+                        if (otherIdx === currentIdx) {
                             return false;
                         }
                         if (other.day !== entry.day) {
@@ -760,7 +862,6 @@
                             block.style.background = group.color;
                             if (group.hasOverlap) {
                                 block.classList.add("dimmed");
-                                block.classList.add("overlap-right");
                             }
                             block.innerHTML =
                                 escapeHtml(group.subjects.join(", ")) +
@@ -855,7 +956,7 @@
                             activeSubject = null;
                         }
                         recomputeOverlapFlags();
-                        saveData();
+                        queueSaveData();
                         renderAll();
                     });
 
@@ -894,7 +995,7 @@
                         } else {
                             subjectPeople[activeSubject].splice(selectedIndex, 1);
                         }
-                        saveData();
+                        queueSaveData();
                         renderAll();
                     });
                     chip.appendChild(nameEl);
@@ -911,7 +1012,7 @@
                                 return p !== person;
                             });
                         });
-                        saveData();
+                        queueSaveData();
                         renderAll();
                     });
                     chip.appendChild(removeBtn);
@@ -986,6 +1087,31 @@
                 renderPeopleList();
             }
 
+            function startSyncPolling() {
+                if (!canUseSupabase() || syncIntervalId) {
+                    return;
+                }
+                syncIntervalId = setInterval(async function () {
+                    if (saveInFlight || assignModalEl.classList.contains("open")) {
+                        return;
+                    }
+                    var remote = await pullRemoteState();
+                    if (!remote || !remote.payload || !remote.updated_at) {
+                        return;
+                    }
+                    if (lastRemoteUpdatedAt && remote.updated_at === lastRemoteUpdatedAt) {
+                        return;
+                    }
+                    applyLoadedData(remote.payload);
+                    if (people.length === 0) {
+                        people = DEFAULT_PEOPLE.slice();
+                    }
+                    recomputeOverlapFlags();
+                    lastRemoteUpdatedAt = remote.updated_at;
+                    renderAll();
+                }, 4000);
+            }
+
             subjectForm.addEventListener("submit", function (event) {
                 event.preventDefault();
 
@@ -1025,7 +1151,7 @@
                     subjectPeople[subject] = [];
                 }
                 recomputeOverlapFlags();
-                saveData();
+                queueSaveData();
                 renderAll();
                 subjectForm.reset();
                 dayEl.value = "0";
@@ -1047,7 +1173,7 @@
                 }
                 people.push(name);
                 personNameInputEl.value = "";
-                saveData();
+                queueSaveData();
                 renderAll();
             });
 
@@ -1074,7 +1200,7 @@
                     }
                 });
                 subjectPeople[modalEditingSubject] = unique;
-                saveData();
+                queueSaveData();
                 closeAssignModal();
                 renderAll();
             });
@@ -1091,11 +1217,17 @@
                 }
             });
 
-            buildHourOptions();
-            buildMinuteOptions();
-            loadData();
-            renderAll();
+            async function init() {
+                buildHourOptions();
+                buildMinuteOptions();
+                await loadData();
+                renderAll();
+                startSyncPolling();
+            }
+
+            init();
         })();
     </script>
 </body>
+
 </html>
