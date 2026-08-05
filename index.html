@@ -315,7 +315,7 @@
         .event-block {
             position: absolute;
             left: 0;
-            right: 0;
+            width: 100%;
             border-radius: 10px;
             padding: 0.35rem 0.48rem;
             font-size: 0.73rem;
@@ -327,10 +327,6 @@
             cursor: pointer;
         }
 
-        .event-block.dimmed {
-            opacity: 0.5;
-        }
-
         .event-block .prof-line,
         .event-block .people-line {
             display: block;
@@ -338,6 +334,28 @@
             font-size: 0.68rem;
             color: rgba(15, 23, 42, 0.7);
             font-weight: 500;
+        }
+
+        .event-block.split {
+            padding: 0.3rem 0.34rem;
+            font-size: 0.69rem;
+            box-shadow: 0 1px 5px rgba(15, 23, 42, 0.1);
+            word-break: break-all;
+        }
+
+        .event-block.split .prof-line,
+        .event-block.split .people-line {
+            font-size: 0.62rem;
+        }
+
+        .event-block.split-3 {
+            font-size: 0.65rem;
+            padding: 0.26rem 0.28rem;
+        }
+
+        .event-block.split-3 .prof-line,
+        .event-block.split-3 .people-line {
+            font-size: 0.58rem;
         }
 
         .modal-overlay {
@@ -531,6 +549,7 @@
             var SLOT_MINUTE_STEP = 15;
             var PIXELS_PER_MINUTE = 1.05;
             var BOTTOM_PADDING_MINUTES = 0;
+            var COLUMN_GAP_PX = 4;
             var DAYS = ["월", "화", "수", "목", "금"];
             var DEFAULT_PEOPLE = ["황재윤", "Priyanka", "윤상원", "최현수", "김민성", "이정민", "김도현", "박세현", "김성현", "이찬근", "이종헌", "오재은"];
             var entries = [];
@@ -786,6 +805,62 @@
                 return bg;
             }
 
+            // 같은 요일의 항목들을 겹침 클러스터 단위로 묶어 열(column)을 배정한다.
+            // 한 클러스터에서 필요한 열 개수가 그 구간의 등분 개수가 된다.
+            function layoutDayEntries(dayEntries) {
+                var sorted = dayEntries.slice().sort(function (a, b) {
+                    if (a.startMin !== b.startMin) {
+                        return a.startMin - b.startMin;
+                    }
+                    return a.endMin - b.endMin;
+                });
+
+                var placed = [];
+                var cluster = [];
+                var columnEnds = [];
+                var clusterEnd = -1;
+
+                function flushCluster() {
+                    var columnCount = columnEnds.length;
+                    cluster.forEach(function (item) {
+                        item.columnCount = columnCount;
+                    });
+                    cluster = [];
+                    columnEnds = [];
+                    clusterEnd = -1;
+                }
+
+                sorted.forEach(function (entry) {
+                    if (cluster.length > 0 && entry.startMin >= clusterEnd) {
+                        flushCluster();
+                    }
+
+                    var columnIndex = -1;
+                    for (var i = 0; i < columnEnds.length; i += 1) {
+                        if (columnEnds[i] <= entry.startMin) {
+                            columnIndex = i;
+                            break;
+                        }
+                    }
+                    if (columnIndex === -1) {
+                        columnEnds.push(entry.endMin);
+                        columnIndex = columnEnds.length - 1;
+                    } else {
+                        columnEnds[columnIndex] = entry.endMin;
+                    }
+
+                    var item = { entry: entry, columnIndex: columnIndex, columnCount: 1 };
+                    cluster.push(item);
+                    placed.push(item);
+                    if (entry.endMin > clusterEnd) {
+                        clusterEnd = entry.endMin;
+                    }
+                });
+
+                flushCluster();
+                return placed;
+            }
+
             function renderTimetable() {
                 var totalMinutes = (TIME_END - TIME_START) * 60;
                 var totalMinutesWithPadding = totalMinutes + BOTTOM_PADDING_MINUTES;
@@ -810,76 +885,54 @@
                     track.style.height = trackHeight + "px";
                     track.style.backgroundSize = "100% " + (60 * PIXELS_PER_MINUTE) + "px";
 
-                    var groups = {};
-                    entries.forEach(function (entry) {
-                        if (entry.day !== d) {
-                            return;
-                        }
-                        var groupKey = String(entry.startMin) + "-" + String(entry.endMin);
-                        if (!groups[groupKey]) {
-                            groups[groupKey] = {
-                                startMin: entry.startMin,
-                                endMin: entry.endMin,
-                                subjects: [],
-                                professors: [],
-                                people: [],
-                                color: getSubjectColor(entry.subject),
-                                subjectSet: {},
-                                hasOverlap: false
-                            };
-                        }
-                        if (groups[groupKey].subjects.indexOf(entry.subject) === -1) {
-                            groups[groupKey].subjects.push(entry.subject);
-                            groups[groupKey].subjectSet[entry.subject] = true;
-                        }
-                        if (groups[groupKey].professors.indexOf(entry.professor) === -1) {
-                            groups[groupKey].professors.push(entry.professor);
-                        }
-                        (subjectPeople[entry.subject] || []).forEach(function (personName) {
-                            if (groups[groupKey].people.indexOf(personName) === -1) {
-                                groups[groupKey].people.push(personName);
-                            }
-                        });
-                        if (entry.isOverlap) {
-                            groups[groupKey].hasOverlap = true;
-                        }
+                    var dayEntries = entries.filter(function (entry) {
+                        return entry.day === d;
                     });
 
-                    Object.keys(groups)
-                        .map(function (key) { return groups[key]; })
-                        .sort(function (a, b) { return a.startMin - b.startMin; })
-                        .forEach(function (group) {
-                            var top = (group.startMin - (TIME_START * 60)) * PIXELS_PER_MINUTE;
-                            var height = (group.endMin - group.startMin) * PIXELS_PER_MINUTE;
-                            if (height < 20) {
-                                height = 20;
-                            }
+                    layoutDayEntries(dayEntries).forEach(function (item) {
+                        var entry = item.entry;
+                        var columnCount = item.columnCount;
+                        var widthPercent = 100 / columnCount;
+                        var top = (entry.startMin - (TIME_START * 60)) * PIXELS_PER_MINUTE;
+                        var height = (entry.endMin - entry.startMin) * PIXELS_PER_MINUTE;
+                        if (height < 20) {
+                            height = 20;
+                        }
 
-                            var block = document.createElement("div");
-                            block.className = "event-block";
-                            block.style.top = top + "px";
-                            block.style.height = height + "px";
-                            block.style.background = group.color;
-                            if (group.hasOverlap) {
-                                block.classList.add("dimmed");
-                            }
-                            block.innerHTML =
-                                escapeHtml(group.subjects.join(", ")) +
-                                '<span class="prof-line">' + escapeHtml(group.professors.join(", ")) + "</span>" +
-                                (group.people.length > 0
-                                    ? '<span class="people-line">' + escapeHtml(group.people.join(", ")) + "</span>"
-                                    : "");
-                            block.addEventListener("click", function () {
-                                var targetSubject = group.subjects[0] || null;
-                                if (!targetSubject) {
-                                    return;
-                                }
-                                activeSubject = targetSubject;
-                                openAssignModal(targetSubject);
-                                renderAll();
-                            });
-                            track.appendChild(block);
+                        var assignedPeople = subjectPeople[entry.subject] || [];
+
+                        var block = document.createElement("div");
+                        block.className = "event-block";
+                        if (columnCount > 1) {
+                            block.classList.add("split");
+                        }
+                        if (columnCount > 2) {
+                            block.classList.add("split-3");
+                        }
+                        block.style.top = top + "px";
+                        block.style.height = height + "px";
+                        block.style.left = (item.columnIndex * widthPercent) + "%";
+                        block.style.width = columnCount > 1
+                            ? "calc(" + widthPercent + "% - " + COLUMN_GAP_PX + "px)"
+                            : "100%";
+                        block.style.background = getSubjectColor(entry.subject);
+                        block.innerHTML =
+                            escapeHtml(entry.subject) +
+                            '<span class="prof-line">' + escapeHtml(entry.professor) + "</span>" +
+                            (assignedPeople.length > 0
+                                ? '<span class="people-line">' + escapeHtml(assignedPeople.join(", ")) + "</span>"
+                                : "");
+                        block.title =
+                            entry.subject + " · " + entry.professor + " · " +
+                            formatTime(entry.startMin) + "-" + formatTime(entry.endMin) +
+                            (assignedPeople.length > 0 ? " · " + assignedPeople.join(", ") : "");
+                        block.addEventListener("click", function () {
+                            activeSubject = entry.subject;
+                            openAssignModal(entry.subject);
+                            renderAll();
                         });
+                        track.appendChild(block);
+                    });
 
                     daysGridEl.appendChild(track);
                 }
