@@ -41,11 +41,24 @@
             padding: 2rem;
         }
 
+        header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            padding: 1.5rem 0;
+        }
+
         h1 {
             font-family: "Outfit", sans-serif;
             font-size: 2.2rem;
             letter-spacing: -0.02em;
             font-weight: 700;
+        }
+
+        h1 span {
+            background: linear-gradient(120deg, #0891b2, #2563eb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .card {
@@ -55,38 +68,6 @@
             box-shadow: var(--shadow-soft);
             padding: 1.1rem 1.2rem;
             margin-bottom: 1rem;
-        }
-
-        .sync-status {
-            font-size: 0.74rem;
-            color: var(--text-secondary);
-            margin-bottom: 0.7rem;
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-            word-break: break-all;
-        }
-
-        .sync-status::before {
-            content: "";
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background: #94a3b8;
-            flex: none;
-        }
-
-        .sync-status.ok::before {
-            background: #16a34a;
-        }
-
-        .sync-status.error {
-            color: #b91c1c;
-            font-weight: 600;
-        }
-
-        .sync-status.error::before {
-            background: #dc2626;
         }
 
         .people-grid {
@@ -476,7 +457,6 @@
 <body>
     <div class="container">
         <section class="card timetable-wrap">
-            <div id="syncStatus" class="sync-status">서버 연결 확인 중…</div>
             <div class="timetable">
                 <div class="schedule-head">
                     <div class="head-cell">시간</div>
@@ -557,14 +537,13 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
         (function () {
             var LOCAL_FALLBACK_KEY = "uni-timetable-v6-fallback";
             var SUPABASE_URL = "https://ychrynjxxrmrzuvuifol.supabase.co";
             var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InljaHJ5bmp4eHJtcnp1dnVpZm9sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwMDk2NTgsImV4cCI6MjA4ODU4NTY1OH0.DkXgtX69hWxSWv_RZHxX7qdjCUfL7rXgyqQrffb_gsg";
-            var TABLE_NAME = "timetable_states";
             var SCHEDULE_ID = "shared-timetable";
-            var REST_ENDPOINT = SUPABASE_URL + "/rest/v1/" + TABLE_NAME;
             var TIME_START = 9;
             var TIME_END = 18;
             var SLOT_MINUTE_STEP = 15;
@@ -594,7 +573,6 @@
             var personNameInputEl = document.getElementById("personNameInput");
             var addPersonBtnEl = document.getElementById("addPersonBtn");
             var selectionHintEl = document.getElementById("selectionHint");
-            var syncStatusEl = document.getElementById("syncStatus");
             var assignModalEl = document.getElementById("assignModal");
             var assignModalTitleEl = document.getElementById("assignModalTitle");
             var assignModalGridEl = document.getElementById("assignModalGrid");
@@ -602,52 +580,12 @@
             var assignModalSaveEl = document.getElementById("assignModalSave");
             var modalEditingSubject = null;
             var modalCheckedPeople = [];
+            var supabaseClient = null;
             var saveTimer = null;
             var saveInFlight = false;
             var pendingSave = false;
             var lastRemoteUpdatedAt = null;
             var syncIntervalId = null;
-
-            // ── 저장소 래퍼 ─────────────────────────────────────────────
-            // Notion 등 third-party iframe에서는 localStorage 접근이
-            // DOMException을 던진다. 그때는 메모리 저장으로 조용히 대체한다.
-            var safeStorage = (function () {
-                var memory = {};
-                var usable = false;
-                try {
-                    window.localStorage.setItem("__probe__", "1");
-                    window.localStorage.removeItem("__probe__");
-                    usable = true;
-                } catch (error) {
-                    usable = false;
-                }
-                return {
-                    usable: usable,
-                    getItem: function (key) {
-                        try {
-                            return usable ? window.localStorage.getItem(key) : (memory[key] || null);
-                        } catch (error) {
-                            return memory[key] || null;
-                        }
-                    },
-                    setItem: function (key, value) {
-                        memory[key] = value;
-                        try {
-                            if (usable) {
-                                window.localStorage.setItem(key, value);
-                            }
-                        } catch (error) {
-                            /* 무시: 메모리에는 이미 저장됨 */
-                        }
-                    }
-                };
-            })();
-
-            function setStatus(message, isError) {
-                syncStatusEl.textContent = message;
-                syncStatusEl.classList.toggle("error", Boolean(isError));
-                syncStatusEl.classList.toggle("ok", !isError);
-            }
 
             function buildHourOptions() {
                 for (var h = TIME_START; h < TIME_END; h += 1) {
@@ -689,6 +627,16 @@
                 return num < 10 ? "0" + num : String(num);
             }
 
+            function canUseSupabase() {
+                return (
+                    typeof window.supabase !== "undefined" &&
+                    SUPABASE_URL &&
+                    SUPABASE_ANON_KEY &&
+                    SUPABASE_URL !== "YOUR_SUPABASE_URL" &&
+                    SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY"
+                );
+            }
+
             function getSerializableData() {
                 return {
                     entries: entries,
@@ -699,7 +647,17 @@
             }
 
             function cacheDataLocally() {
-                safeStorage.setItem(LOCAL_FALLBACK_KEY, JSON.stringify(getSerializableData()));
+                localStorage.setItem(LOCAL_FALLBACK_KEY, JSON.stringify(getSerializableData()));
+            }
+
+            function createSupabaseClientIfNeeded() {
+                if (!canUseSupabase()) {
+                    return null;
+                }
+                if (!supabaseClient) {
+                    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                }
+                return supabaseClient;
             }
 
             function applyLoadedData(parsed) {
@@ -722,97 +680,55 @@
                 });
             }
 
-            // ── Supabase REST 통신 ──────────────────────────────────────
-            // supabase-js CDN 대신 fetch를 직접 쓴다. CDN 로드 실패와
-            // 라이브러리 내부의 localStorage 세션 저장 문제를 둘 다 피한다.
-            function restHeaders(extra) {
-                var headers = {
-                    "apikey": SUPABASE_ANON_KEY,
-                    "Authorization": "Bearer " + SUPABASE_ANON_KEY,
-                    "Content-Type": "application/json"
-                };
-                if (extra) {
-                    Object.keys(extra).forEach(function (key) {
-                        headers[key] = extra[key];
-                    });
-                }
-                return headers;
-            }
-
             async function pullRemoteState() {
-                var url = REST_ENDPOINT +
-                    "?select=payload,updated_at" +
-                    "&schedule_id=eq." + encodeURIComponent(SCHEDULE_ID) +
-                    "&limit=1";
-                var response = await fetch(url, {
-                    method: "GET",
-                    headers: restHeaders(),
-                    cache: "no-store"
-                });
-                if (!response.ok) {
-                    var errorText = await response.text();
-                    throw new Error("조회 실패 " + response.status + ": " + errorText.slice(0, 160));
-                }
-                var rows = await response.json();
-                if (!Array.isArray(rows) || rows.length === 0 || !rows[0].payload) {
+                var client = createSupabaseClientIfNeeded();
+                if (!client) {
                     return null;
                 }
-                return rows[0];
-            }
-
-            async function pushRemoteState(payload, updatedAtIso) {
-                var response = await fetch(REST_ENDPOINT + "?on_conflict=schedule_id", {
-                    method: "POST",
-                    headers: restHeaders({ "Prefer": "resolution=merge-duplicates,return=minimal" }),
-                    body: JSON.stringify({
-                        schedule_id: SCHEDULE_ID,
-                        payload: payload,
-                        updated_at: updatedAtIso
-                    })
-                });
-                if (!response.ok) {
-                    var errorText = await response.text();
-                    throw new Error("저장 실패 " + response.status + ": " + errorText.slice(0, 160));
+                var result = await client
+                    .from("timetable_states")
+                    .select("payload, updated_at")
+                    .eq("schedule_id", SCHEDULE_ID)
+                    .maybeSingle();
+                if (result.error) {
+                    return null;
                 }
+                if (!result.data || !result.data.payload) {
+                    return null;
+                }
+                return result.data;
             }
 
             async function loadData() {
-                var remote = null;
-                var remoteError = null;
-
                 try {
-                    remote = await pullRemoteState();
-                } catch (error) {
-                    remoteError = error;
-                }
-
-                if (remote) {
-                    applyLoadedData(remote.payload);
-                    lastRemoteUpdatedAt = remote.updated_at || null;
-                    setStatus("서버와 동기화됨" + (safeStorage.usable ? "" : " (로컬 캐시 사용 불가 환경)"), false);
-                } else {
-                    // 서버가 비어 있거나 실패한 경우에만 로컬 캐시를 본다.
-                    try {
-                        var raw = safeStorage.getItem(LOCAL_FALLBACK_KEY);
+                    var remote = await pullRemoteState();
+                    if (remote && remote.payload) {
+                        applyLoadedData(remote.payload);
+                        lastRemoteUpdatedAt = remote.updated_at || null;
+                    } else {
+                        var raw = localStorage.getItem(LOCAL_FALLBACK_KEY);
                         if (raw) {
                             applyLoadedData(JSON.parse(raw));
                         }
-                    } catch (error) {
-                        /* 캐시 파싱 실패는 무시 */
                     }
-                    if (remoteError) {
-                        setStatus("서버 연결 실패 — " + remoteError.message, true);
-                    } else {
-                        setStatus("서버에 저장된 시간표가 없습니다. 과목을 추가하면 저장됩니다.", false);
-                    }
+                    entries.forEach(function (entry) {
+                        if (!Array.isArray(subjectPeople[entry.subject])) {
+                            subjectPeople[entry.subject] = [];
+                        }
+                        if (Array.isArray(entry.selectedPeople)) {
+                            entry.selectedPeople.forEach(function (personName) {
+                                if (subjectPeople[entry.subject].indexOf(personName) === -1) {
+                                    subjectPeople[entry.subject].push(personName);
+                                }
+                            });
+                        }
+                    });
+                } catch (error) {
+                    entries = [];
+                    colorBySubject = {};
+                    people = [];
+                    subjectPeople = {};
                 }
-
-                entries.forEach(function (entry) {
-                    if (!Array.isArray(subjectPeople[entry.subject])) {
-                        subjectPeople[entry.subject] = [];
-                    }
-                });
-
                 if (people.length === 0) {
                     people = DEFAULT_PEOPLE.slice();
                 }
@@ -821,16 +737,26 @@
 
             async function persistDataNow() {
                 cacheDataLocally();
+                var client = createSupabaseClientIfNeeded();
+                if (!client) {
+                    return;
+                }
                 saveInFlight = true;
                 var nowIso = new Date().toISOString();
-                try {
-                    await pushRemoteState(getSerializableData(), nowIso);
+                var payload = getSerializableData();
+                var result = await client
+                    .from("timetable_states")
+                    .upsert(
+                        {
+                            schedule_id: SCHEDULE_ID,
+                            payload: payload,
+                            updated_at: nowIso
+                        },
+                        { onConflict: "schedule_id" }
+                    );
+                saveInFlight = false;
+                if (!result.error) {
                     lastRemoteUpdatedAt = nowIso;
-                    setStatus("저장 완료 (" + formatClock(new Date()) + ")", false);
-                } catch (error) {
-                    setStatus(error.message, true);
-                } finally {
-                    saveInFlight = false;
                 }
                 if (pendingSave) {
                     pendingSave = false;
@@ -851,10 +777,6 @@
                     saveTimer = null;
                     persistDataNow();
                 }, 250);
-            }
-
-            function formatClock(date) {
-                return pad2(date.getHours()) + ":" + pad2(date.getMinutes()) + ":" + pad2(date.getSeconds());
             }
 
             function recomputeOverlapFlags() {
@@ -883,8 +805,8 @@
                 return bg;
             }
 
-            // 같은 요일 항목을 겹침 클러스터로 묶고 열(column)을 배정한다.
-            // 클러스터에 필요한 열 개수가 그 구간의 등분 수가 된다.
+            // 같은 요일의 항목들을 겹침 클러스터 단위로 묶어 열(column)을 배정한다.
+            // 한 클러스터에서 필요한 열 개수가 그 구간의 등분 개수가 된다.
             function layoutDayEntries(dayEntries) {
                 var sorted = dayEntries.slice().sort(function (a, b) {
                     if (a.startMin !== b.startMin) {
@@ -941,7 +863,8 @@
 
             function renderTimetable() {
                 var totalMinutes = (TIME_END - TIME_START) * 60;
-                var trackHeight = (totalMinutes + BOTTOM_PADDING_MINUTES) * PIXELS_PER_MINUTE;
+                var totalMinutesWithPadding = totalMinutes + BOTTOM_PADDING_MINUTES;
+                var trackHeight = totalMinutesWithPadding * PIXELS_PER_MINUTE;
 
                 timeAxisEl.innerHTML = "";
                 timeAxisEl.style.height = trackHeight + "px";
@@ -1218,36 +1141,27 @@
             }
 
             function startSyncPolling() {
-                if (syncIntervalId) {
+                if (!canUseSupabase() || syncIntervalId) {
                     return;
                 }
                 syncIntervalId = setInterval(async function () {
                     if (saveInFlight || assignModalEl.classList.contains("open")) {
                         return;
                     }
-                    if (document.hidden) {
+                    var remote = await pullRemoteState();
+                    if (!remote || !remote.payload || !remote.updated_at) {
                         return;
                     }
-                    try {
-                        var remote = await pullRemoteState();
-                        if (!remote || !remote.payload || !remote.updated_at) {
-                            return;
-                        }
-                        if (lastRemoteUpdatedAt && remote.updated_at === lastRemoteUpdatedAt) {
-                            return;
-                        }
-                        applyLoadedData(remote.payload);
-                        if (people.length === 0) {
-                            people = DEFAULT_PEOPLE.slice();
-                        }
-                        recomputeOverlapFlags();
-                        lastRemoteUpdatedAt = remote.updated_at;
-                        cacheDataLocally();
-                        setStatus("갱신됨 (" + formatClock(new Date()) + ")", false);
-                        renderAll();
-                    } catch (error) {
-                        setStatus("동기화 실패 — " + error.message, true);
+                    if (lastRemoteUpdatedAt && remote.updated_at === lastRemoteUpdatedAt) {
+                        return;
                     }
+                    applyLoadedData(remote.payload);
+                    if (people.length === 0) {
+                        people = DEFAULT_PEOPLE.slice();
+                    }
+                    recomputeOverlapFlags();
+                    lastRemoteUpdatedAt = remote.updated_at;
+                    renderAll();
                 }, 4000);
             }
 
@@ -1354,10 +1268,6 @@
                 if (event.key === "Escape" && assignModalEl.classList.contains("open")) {
                     closeAssignModal();
                 }
-            });
-
-            window.addEventListener("error", function (event) {
-                setStatus("스크립트 오류 — " + (event.message || "unknown"), true);
             });
 
             async function init() {
